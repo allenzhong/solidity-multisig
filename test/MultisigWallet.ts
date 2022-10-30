@@ -50,5 +50,20 @@ describe("MultisigWallet", function () {
         )
       ).to.be.revertedWith("invalid owner");
     });
+
+    it("Should not allow owners duplication", async function () {
+      const [owner, otherAccount] = await ethers.getSigners();
+      const MultisigWallet = await ethers.getContractFactory("MultisigWallet");
+      await expect(
+        MultisigWallet.deploy(
+          [
+            otherAccount.getAddress(),
+            owner.getAddress(),
+            otherAccount.getAddress(),
+          ],
+          3
+        )
+      ).to.be.revertedWith("owner not unique");
+    });
   });
 });

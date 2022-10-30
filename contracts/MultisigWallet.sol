@@ -3,7 +3,8 @@ pragma solidity ^0.8.9;
 
 contract MultisigWallet {
   address[] public owners;
-  // mapping(address => bool) public isOwner;
+  mapping(address => bool) public isOwner;
+
   // uint numConfirmationsRequired;
 
   constructor(address[] memory _owners, uint256 _numConfirmationsRequired)
@@ -17,9 +18,12 @@ contract MultisigWallet {
       "invalid number of required confirmations"
     );
 
-    for (uint i = 0; i < _owners.length; i++) {
+    for (uint256 i = 0; i < _owners.length; i++) {
       address owner = _owners[i];
       require(owner != address(0), "invalid owner");
+      require(!isOwner[owner], "owner not unique");
+
+      isOwner[owner] = true;
     }
   }
 }
