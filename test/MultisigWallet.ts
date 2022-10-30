@@ -4,18 +4,6 @@ import { expect } from "chai";
 import { ethers } from "hardhat";
 
 describe("MultisigWallet", function () {
-  async function deployFixture() {
-    // Contracts are deployed using the first signer/account by default
-    const [owner, account1, account2] = await ethers.getSigners();
-
-    const MultisigWallet = await ethers.getContractFactory("MultisigWallet");
-
-    const wallet = await MultisigWallet.deploy(
-      [owner.address, account1.address, account2.address],
-      3
-    );
-    return { MultisigWallet, wallet, owner, account1, account2 };
-  }
 
   describe("Deployment", function () {
     it("Should fail if owners are empty", async function () {
@@ -64,6 +52,28 @@ describe("MultisigWallet", function () {
           3
         )
       ).to.be.revertedWith("owner not unique");
+    });
+
+    async function deployThreeOwnersFixture() {
+      // Contracts are deployed using the first signer/account by default
+      const [owner, account1, account2] = await ethers.getSigners();
+  
+      const MultisigWallet = await ethers.getContractFactory("MultisigWallet");
+  
+      const wallet = await MultisigWallet.deploy(
+        [owner.address, account1.address, account2.address],
+        3
+      );
+      return { MultisigWallet, wallet, owner, account1, account2 };
+    }
+  
+    it("should add owners and number of confirmations from constructor", async function () {
+      const { wallet, owner, account1, account2 } = await loadFixture(deployThreeOwnersFixture); 
+
+      expect(await wallet.isOwner(owner.address)).to.equal(true);
+      expect(await wallet.isOwner(account1.address)).to.equal(true);
+      expect(await wallet.isOwner(account2.address)).to.equal(true);
+      expect(await wallet.numConfirmationsRequired()).to.equal(3);
     });
   });
 });
