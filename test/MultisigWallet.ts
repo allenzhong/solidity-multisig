@@ -20,5 +20,16 @@ describe("MultisigWallet", function () {
         "owners required"
       );
     });
+
+    it("Should fail if number of confirmation is 0", async function () {
+      const [owner, otherAccount] = await ethers.getSigners();
+      const MultisigWallet = await ethers.getContractFactory("MultisigWallet");
+      await expect(
+        MultisigWallet.deploy(
+          [owner.getAddress(), otherAccount.getAddress()],
+          0
+        )
+      ).to.be.revertedWith("invalid number of required confirmations");
+    });
   });
 });
