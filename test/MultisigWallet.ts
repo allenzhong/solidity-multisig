@@ -26,7 +26,7 @@ describe("MultisigWallet", function () {
     it("Should not allow add 0x0 address", async function () {
       const [owner, otherAccount] = await ethers.getSigners();
       const MultisigWallet = await ethers.getContractFactory("MultisigWallet");
-      await expect(
+      expect(
         MultisigWallet.deploy(
           [
             "0x0000000000000000000000000000000000000000",
@@ -55,7 +55,7 @@ describe("MultisigWallet", function () {
 
     async function deployThreeOwnersFixture() {
       // Contracts are deployed using the first signer/account by default
-      const [owner, account1, account2] = await ethers.getSigners();
+      const [owner, account1, account2, notOwner] = await ethers.getSigners();
 
       const MultisigWallet = await ethers.getContractFactory("MultisigWallet");
 
@@ -63,7 +63,7 @@ describe("MultisigWallet", function () {
         [owner.address, account1.address, account2.address],
         3
       );
-      return { MultisigWallet, wallet, owner, account1, account2 };
+      return { MultisigWallet, wallet, owner, account1, account2, notOwner };
     }
 
     it("should add owners and number of confirmations from constructor", async function () {
@@ -109,6 +109,38 @@ describe("MultisigWallet", function () {
       );
       const balance = await wallet.getBalance();
       expect(balance).to.equal(ethers.utils.parseEther("1.0"));
+    });
+
+    it("should be unable to call submitTransaction by others", async function () {
+      const { wallet, owner, account1, account2, notOwner } = await loadFixture(
+        deployThreeOwnersFixture
+      );
+
+      expect(await wallet.isOwner(notOwner.address)).to.equal(false);
+      await expect(
+        wallet
+          .connect(notOwner)
+          .submitTransaction(account1.address, 0, "0x", { gasLimit: 5000000 })
+      ).to.be.revertedWith("not an owner");
+    });
+
+    it("should be able to call submitTransaction by one of owners", async function () {
+      const { wallet, owner, account1, account2, notOwner } = await loadFixture(
+        deployThreeOwnersFixture
+      );
+
+      const result = await wallet
+        .connect(account1)
+        .submitTransaction(account1.address, 0, "0x", { gasLimit: 5000000 });
+      const receipt = await result.wait();
+
+      const { events } = receipt;
+      expect(events).to.not.be.undefined;
+      expect(events?.at(0)?.event).to.equal("SubmitTransaction");
+      const transaction = await wallet.transactions(0);
+      expect(transaction.to).to.equal(account1.address);
+      expect(transaction.value).to.equal(ethers.BigNumber.from(0));
+      expect(transaction.data).to.equal("0x");
     });
   });
 });
