@@ -20,7 +20,7 @@ contract MultisigWallet {
     uint256 value;
     bytes data;
     bool executed;
-    // mapping(address => bool) isConfirmed;
+    mapping(address => bool) isConfirmed;
     uint256 numConfirmations;
   }
 
@@ -76,15 +76,12 @@ contract MultisigWallet {
   ) public onlyOwner {
     uint256 txIndex = transactions.length;
 
-    transactions.push(
-      Transaction({
-        to: _to,
-        value: _value,
-        data: _data,
-        executed: false,
-        numConfirmations: 0
-      })
-    );
+    Transaction storage transaction = transactions.push();
+    transaction.to = _to;
+    transaction.value = _value;
+    transaction.data = _data;
+    transaction.executed = false;
+    transaction.numConfirmations = 0;
 
     emit SubmitTransaction(msg.sender, txIndex, _to, _value, _data);
   }
