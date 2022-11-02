@@ -37,6 +37,14 @@ contract MultisigWallet {
     _;
   }
 
+  modifier notConfirmed(uint256 _txIndex) {
+    require(
+      !transactions[_txIndex].isConfirmed[msg.sender],
+      "tx already confirmed"
+    );
+    _;
+  }
+
   constructor(address[] memory _owners, uint256 _numConfirmationsRequired)
     public
   {
@@ -96,6 +104,7 @@ contract MultisigWallet {
     public
     onlyOwner
     txExists(_txIndex)
+    notConfirmed(_txIndex)
   {
     Transaction storage transaction = transactions[_txIndex];
 
