@@ -2,9 +2,22 @@ import { time, loadFixture } from "@nomicfoundation/hardhat-network-helpers";
 import { anyValue } from "@nomicfoundation/hardhat-chai-matchers/withArgs";
 import { expect } from "chai";
 import { ethers } from "hardhat";
+import { MultiSigWallet } from "../typechain-types/MultisigWallet.sol/MultiSigWallet";
 
 describe("MultisigWallet", function () {
-  describe("Deployment", function () {
+  async function deployThreeOwnersFixture() {
+    // Contracts are deployed using the first signer/account by default
+    const [owner, account1, account2, notOwner] = await ethers.getSigners();
+
+    const MultisigWallet = await ethers.getContractFactory("MultisigWallet");
+
+    const wallet = await MultisigWallet.deploy(
+      [owner.address, account1.address, account2.address],
+      3
+    );
+    return { MultisigWallet, wallet, owner, account1, account2, notOwner };
+  }
+  describe("Deploy - Constructor", function () {
     it("Should fail if owners are empty", async function () {
       const MultisigWallet = await ethers.getContractFactory("MultisigWallet");
       await expect(MultisigWallet.deploy([], 0)).to.be.revertedWith(
@@ -53,19 +66,6 @@ describe("MultisigWallet", function () {
       ).to.be.revertedWith("owner not unique");
     });
 
-    async function deployThreeOwnersFixture() {
-      // Contracts are deployed using the first signer/account by default
-      const [owner, account1, account2, notOwner] = await ethers.getSigners();
-
-      const MultisigWallet = await ethers.getContractFactory("MultisigWallet");
-
-      const wallet = await MultisigWallet.deploy(
-        [owner.address, account1.address, account2.address],
-        3
-      );
-      return { MultisigWallet, wallet, owner, account1, account2, notOwner };
-    }
-
     it("should add owners and number of confirmations from constructor", async function () {
       const { wallet, owner, account1, account2 } = await loadFixture(
         deployThreeOwnersFixture
@@ -88,7 +88,9 @@ describe("MultisigWallet", function () {
         account2.address,
       ]);
     });
+  });
 
+  describe("deposit", function () {
     it("should be able to deposit to MultisigWallet contract", async function () {
       const { wallet, owner, account1, account2 } = await loadFixture(
         deployThreeOwnersFixture
@@ -110,7 +112,9 @@ describe("MultisigWallet", function () {
       const balance = await wallet.getBalance();
       expect(balance).to.equal(ethers.utils.parseEther("1.0"));
     });
+  });
 
+  describe("submitTransaction", function () {
     it("should be unable to call submitTransaction by others", async function () {
       const { wallet, owner, account1, account2, notOwner } = await loadFixture(
         deployThreeOwnersFixture
@@ -141,6 +145,36 @@ describe("MultisigWallet", function () {
       expect(transaction.to).to.equal(account1.address);
       expect(transaction.value).to.equal(ethers.BigNumber.from(0));
       expect(transaction.data).to.equal("0x");
+    });
+  });
+
+  describe("confirmTransaction", function () {
+    const submittedTxIndex = 0;
+    let submitWallet: MultiSigWallet;
+    let submittedTxOwner: any;
+    let submittedToAddress: string;
+    let submittedTxNotOwner: any;
+    this.beforeEach(async () => {
+      const { wallet, owner, account1, account2, notOwner } = await loadFixture(
+        deployThreeOwnersFixture
+      );
+      submitWallet = wallet;
+      submittedTxOwner = owner;
+      submittedToAddress = account1.address;
+      submittedTxNotOwner = notOwner;
+      const result = await wallet
+        .connect(submittedTxOwner)
+        .submitTransaction(submittedToAddress, submittedTxIndex, "0x", {
+          gasLimit: 5000000,
+        });
+      const receipt = await result.wait();
+    });
+    it('should be unable to call "confirmTransaction" by one who is not owner', async function () {
+      await expect(
+        submitWallet
+          .connect(submittedTxNotOwner)
+          .confirmTransaction(submittedTxIndex, { gasLimit: 5000000 })
+      ).to.be.revertedWith("not an owner");
     });
   });
 });
