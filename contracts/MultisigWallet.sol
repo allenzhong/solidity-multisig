@@ -10,6 +10,7 @@ contract MultisigWallet {
     uint256 value,
     bytes data
   );
+  event ConfirmTransaction(address indexed owner, uint256 indexed txIndex);
 
   address[] public owners;
   mapping(address => bool) public isOwner;
@@ -95,5 +96,12 @@ contract MultisigWallet {
     public
     onlyOwner
     txExists(_txIndex)
-  {}
+  {
+    Transaction storage transaction = transactions[_txIndex];
+
+    transaction.isConfirmed[msg.sender] = true;
+    transaction.numConfirmations += 1;
+
+    emit ConfirmTransaction(msg.sender, _txIndex);
+  }
 }

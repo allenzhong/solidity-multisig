@@ -2,7 +2,7 @@ import { time, loadFixture } from "@nomicfoundation/hardhat-network-helpers";
 import { anyValue } from "@nomicfoundation/hardhat-chai-matchers/withArgs";
 import { expect } from "chai";
 import { ethers } from "hardhat";
-import { MultiSigWallet } from "../typechain-types/MultisigWallet.sol/MultiSigWallet";
+import { MultisigWallet } from "../typechain-types/MultisigWallet";
 
 describe("MultisigWallet", function () {
   async function deployThreeOwnersFixture() {
@@ -150,7 +150,7 @@ describe("MultisigWallet", function () {
 
   describe("confirmTransaction", function () {
     const submittedTxIndex = 0;
-    let submitWallet: MultiSigWallet;
+    let submitWallet: MultisigWallet;
     let submittedTxOwner: any;
     let submittedToAddress: string;
     let submittedTxNotOwner: any;
@@ -169,19 +169,42 @@ describe("MultisigWallet", function () {
         });
       const receipt = await result.wait();
     });
+
     it('should be unable to call "confirmTransaction" by one who is not owner', async function () {
       await expect(
         submitWallet
           .connect(submittedTxNotOwner)
-          .confirmTransaction(submittedTxIndex, { gasLimit: 5000000 })
+          .confirmTransaction(submittedTxIndex)
       ).to.be.revertedWith("not an owner");
     });
-    it('should check if txIndex exists', async function () {
+
+    it("should check if txIndex exists", async function () {
       await expect(
         submitWallet
           .connect(submittedTxOwner)
           .confirmTransaction(submittedTxIndex + 1, { gasLimit: 5000000 })
-      ).to.be.revertedWith("tx does not exist"); 
+      ).to.be.revertedWith("tx does not exist");
+    });
+
+    it("should confirm transaction by one of owners", async function () {
+      const tx = await submitWallet
+        .connect(submittedTxOwner)
+        .confirmTransaction(submittedTxIndex, { gasLimit: 5000000 });
+      const receipt = await tx.wait();
+
+      const transaction = await submitWallet
+        .connect(submittedTxNotOwner)
+        .transactions(submittedTxIndex);
+
+      expect(transaction).to.not.undefined;
+      expect(transaction.numConfirmations.toNumber()).to.equal(1);
+      expect(transaction.to).to.equal(submittedToAddress);
+      expect(transaction.executed).to.equal(false);
+
+      const { events } = receipt;
+      const event = events?.at(0);
+
+      expect(event?.event).to.equal("ConfirmTransaction");
     });
   });
 });
