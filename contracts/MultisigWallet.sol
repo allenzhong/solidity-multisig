@@ -31,6 +31,11 @@ contract MultisigWallet {
     _;
   }
 
+  modifier txExists(uint256 _txIndex) {
+    require(_txIndex < transactions.length, "tx does not exist");
+    _;
+  }
+
   constructor(address[] memory _owners, uint256 _numConfirmationsRequired)
     public
   {
@@ -86,5 +91,9 @@ contract MultisigWallet {
     emit SubmitTransaction(msg.sender, txIndex, _to, _value, _data);
   }
 
-  function confirmTransaction(uint256 _txIndex) public onlyOwner {}
+  function confirmTransaction(uint256 _txIndex)
+    public
+    onlyOwner
+    txExists(_txIndex)
+  {}
 }
