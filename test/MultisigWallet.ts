@@ -152,6 +152,8 @@ describe("MultisigWallet", function () {
     const submittedTxIndex = 0;
     let submitWallet: MultisigWallet;
     let submittedTxOwner: any;
+    let walletOwner1: any;
+    let walletOwner2: any;
     let submittedToAddress: string;
     let submittedTxNotOwner: any;
     this.beforeEach(async () => {
@@ -160,6 +162,8 @@ describe("MultisigWallet", function () {
       );
       submitWallet = wallet;
       submittedTxOwner = owner;
+      walletOwner1 = account1;
+      walletOwner2 = account2;
       submittedToAddress = account1.address;
       submittedTxNotOwner = notOwner;
       const result = await wallet
@@ -207,6 +211,32 @@ describe("MultisigWallet", function () {
       expect(event?.event).to.equal("ConfirmTransaction");
     });
 
+    it("should return correct number of confirmations if the transaction has confirmed multiple times", async function () {
+      const tx0 = await submitWallet
+        .connect(submittedTxOwner)
+        .confirmTransaction(submittedTxIndex, { gasLimit: 5000000 });
+      await tx0.wait();
+
+      const tx1 = await submitWallet
+        .connect(walletOwner1)
+        .confirmTransaction(submittedTxIndex, { gasLimit: 5000000 });
+      await tx1.wait();
+
+      const tx2 = await submitWallet
+        .connect(walletOwner2)
+        .confirmTransaction(submittedTxIndex, { gasLimit: 5000000 });
+      await tx2.wait();
+
+      const transaction = await submitWallet
+        .connect(submittedTxNotOwner)
+        .transactions(submittedTxIndex);
+
+      expect(transaction).to.not.undefined;
+      expect(transaction.numConfirmations.toNumber()).to.equal(3);
+      expect(transaction.to).to.equal(submittedToAddress);
+      expect(transaction.executed).to.equal(false);
+    });
+
     it("should be unable to confirm if it have confirmed", async function () {
       const tx = await submitWallet
         .connect(submittedTxOwner)
@@ -219,5 +249,7 @@ describe("MultisigWallet", function () {
           .confirmTransaction(submittedTxIndex, { gasLimit: 5000000 })
       ).to.be.revertedWith("tx already confirmed");
     });
+
+    //TODO: check if the transaction is executed
   });
 });
