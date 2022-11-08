@@ -207,16 +207,17 @@ describe("MultisigWallet", function () {
       expect(event?.event).to.equal("ConfirmTransaction");
     });
 
-    it('should be unable to confirm if it have confirmed', async function () {
+    it("should be unable to confirm if it have confirmed", async function () {
       const tx = await submitWallet
-      .connect(submittedTxOwner)
-      .confirmTransaction(submittedTxIndex, { gasLimit: 5000000 });
-      const receipt = await tx.wait(); 
-
-      await expect(submitWallet
         .connect(submittedTxOwner)
-        .confirmTransaction(submittedTxIndex, { gasLimit: 5000000 }))
-      .to.be.revertedWith("tx already confirmed");
+        .confirmTransaction(submittedTxIndex, { gasLimit: 5000000 });
+      await tx.wait();
+
+      await expect(
+        submitWallet
+          .connect(submittedTxOwner)
+          .confirmTransaction(submittedTxIndex, { gasLimit: 5000000 })
+      ).to.be.revertedWith("tx already confirmed");
     });
   });
 });
