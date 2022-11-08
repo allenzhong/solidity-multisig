@@ -10,6 +10,7 @@ contract MultisigWallet {
     uint256 value,
     bytes data
   );
+  event ConfirmTransaction(address indexed owner, uint256 indexed txIndex);
 
   address[] public owners;
   mapping(address => bool) public isOwner;
@@ -20,7 +21,7 @@ contract MultisigWallet {
     uint256 value;
     bytes data;
     bool executed;
-    // mapping(address => bool) isConfirmed;
+    mapping(address => bool) isConfirmed;
     uint256 numConfirmations;
   }
 
@@ -28,6 +29,19 @@ contract MultisigWallet {
 
   modifier onlyOwner() {
     require(isOwner[msg.sender], "not an owner");
+    _;
+  }
+
+  modifier txExists(uint256 _txIndex) {
+    require(_txIndex < transactions.length, "tx does not exist");
+    _;
+  }
+
+  modifier notConfirmed(uint256 _txIndex) {
+    require(
+      !transactions[_txIndex].isConfirmed[msg.sender],
+      "tx already confirmed"
+    );
     _;
   }
 
@@ -76,16 +90,27 @@ contract MultisigWallet {
   ) public onlyOwner {
     uint256 txIndex = transactions.length;
 
-    transactions.push(
-      Transaction({
-        to: _to,
-        value: _value,
-        data: _data,
-        executed: false,
-        numConfirmations: 0
-      })
-    );
+    Transaction storage transaction = transactions.push();
+    transaction.to = _to;
+    transaction.value = _value;
+    transaction.data = _data;
+    transaction.executed = false;
+    transaction.numConfirmations = 0;
 
     emit SubmitTransaction(msg.sender, txIndex, _to, _value, _data);
+  }
+
+  function confirmTransaction(uint256 _txIndex)
+    public
+    onlyOwner
+    txExists(_txIndex)
+    notConfirmed(_txIndex)
+  {
+    Transaction storage transaction = transactions[_txIndex];
+
+    transaction.isConfirmed[msg.sender] = true;
+    transaction.numConfirmations += 1;
+
+    emit ConfirmTransaction(msg.sender, _txIndex);
   }
 }

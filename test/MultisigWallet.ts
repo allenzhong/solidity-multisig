@@ -2,9 +2,22 @@ import { time, loadFixture } from "@nomicfoundation/hardhat-network-helpers";
 import { anyValue } from "@nomicfoundation/hardhat-chai-matchers/withArgs";
 import { expect } from "chai";
 import { ethers } from "hardhat";
+import { MultisigWallet } from "../typechain-types/MultisigWallet";
 
 describe("MultisigWallet", function () {
-  describe("Deployment", function () {
+  async function deployThreeOwnersFixture() {
+    // Contracts are deployed using the first signer/account by default
+    const [owner, account1, account2, notOwner] = await ethers.getSigners();
+
+    const MultisigWallet = await ethers.getContractFactory("MultisigWallet");
+
+    const wallet = await MultisigWallet.deploy(
+      [owner.address, account1.address, account2.address],
+      3
+    );
+    return { MultisigWallet, wallet, owner, account1, account2, notOwner };
+  }
+  describe("Deploy - Constructor", function () {
     it("Should fail if owners are empty", async function () {
       const MultisigWallet = await ethers.getContractFactory("MultisigWallet");
       await expect(MultisigWallet.deploy([], 0)).to.be.revertedWith(
@@ -53,19 +66,6 @@ describe("MultisigWallet", function () {
       ).to.be.revertedWith("owner not unique");
     });
 
-    async function deployThreeOwnersFixture() {
-      // Contracts are deployed using the first signer/account by default
-      const [owner, account1, account2, notOwner] = await ethers.getSigners();
-
-      const MultisigWallet = await ethers.getContractFactory("MultisigWallet");
-
-      const wallet = await MultisigWallet.deploy(
-        [owner.address, account1.address, account2.address],
-        3
-      );
-      return { MultisigWallet, wallet, owner, account1, account2, notOwner };
-    }
-
     it("should add owners and number of confirmations from constructor", async function () {
       const { wallet, owner, account1, account2 } = await loadFixture(
         deployThreeOwnersFixture
@@ -88,7 +88,9 @@ describe("MultisigWallet", function () {
         account2.address,
       ]);
     });
+  });
 
+  describe("deposit", function () {
     it("should be able to deposit to MultisigWallet contract", async function () {
       const { wallet, owner, account1, account2 } = await loadFixture(
         deployThreeOwnersFixture
@@ -110,7 +112,9 @@ describe("MultisigWallet", function () {
       const balance = await wallet.getBalance();
       expect(balance).to.equal(ethers.utils.parseEther("1.0"));
     });
+  });
 
+  describe("submitTransaction", function () {
     it("should be unable to call submitTransaction by others", async function () {
       const { wallet, owner, account1, account2, notOwner } = await loadFixture(
         deployThreeOwnersFixture
@@ -142,5 +146,110 @@ describe("MultisigWallet", function () {
       expect(transaction.value).to.equal(ethers.BigNumber.from(0));
       expect(transaction.data).to.equal("0x");
     });
+  });
+
+  describe("confirmTransaction", function () {
+    const submittedTxIndex = 0;
+    let submitWallet: MultisigWallet;
+    let submittedTxOwner: any;
+    let walletOwner1: any;
+    let walletOwner2: any;
+    let submittedToAddress: string;
+    let submittedTxNotOwner: any;
+    this.beforeEach(async () => {
+      const { wallet, owner, account1, account2, notOwner } = await loadFixture(
+        deployThreeOwnersFixture
+      );
+      submitWallet = wallet;
+      submittedTxOwner = owner;
+      walletOwner1 = account1;
+      walletOwner2 = account2;
+      submittedToAddress = account1.address;
+      submittedTxNotOwner = notOwner;
+      const result = await wallet
+        .connect(submittedTxOwner)
+        .submitTransaction(submittedToAddress, submittedTxIndex, "0x", {
+          gasLimit: 5000000,
+        });
+      const receipt = await result.wait();
+    });
+
+    it('should be unable to call "confirmTransaction" by one who is not owner', async function () {
+      await expect(
+        submitWallet
+          .connect(submittedTxNotOwner)
+          .confirmTransaction(submittedTxIndex)
+      ).to.be.revertedWith("not an owner");
+    });
+
+    it("should check if txIndex exists", async function () {
+      await expect(
+        submitWallet
+          .connect(submittedTxOwner)
+          .confirmTransaction(submittedTxIndex + 1, { gasLimit: 5000000 })
+      ).to.be.revertedWith("tx does not exist");
+    });
+
+    it("should confirm transaction by one of owners", async function () {
+      const tx = await submitWallet
+        .connect(submittedTxOwner)
+        .confirmTransaction(submittedTxIndex, { gasLimit: 5000000 });
+      const receipt = await tx.wait();
+
+      const transaction = await submitWallet
+        .connect(submittedTxNotOwner)
+        .transactions(submittedTxIndex);
+
+      expect(transaction).to.not.undefined;
+      expect(transaction.numConfirmations.toNumber()).to.equal(1);
+      expect(transaction.to).to.equal(submittedToAddress);
+      expect(transaction.executed).to.equal(false);
+
+      const { events } = receipt;
+      const event = events?.at(0);
+
+      expect(event?.event).to.equal("ConfirmTransaction");
+    });
+
+    it("should return correct number of confirmations if the transaction has confirmed multiple times", async function () {
+      const tx0 = await submitWallet
+        .connect(submittedTxOwner)
+        .confirmTransaction(submittedTxIndex, { gasLimit: 5000000 });
+      await tx0.wait();
+
+      const tx1 = await submitWallet
+        .connect(walletOwner1)
+        .confirmTransaction(submittedTxIndex, { gasLimit: 5000000 });
+      await tx1.wait();
+
+      const tx2 = await submitWallet
+        .connect(walletOwner2)
+        .confirmTransaction(submittedTxIndex, { gasLimit: 5000000 });
+      await tx2.wait();
+
+      const transaction = await submitWallet
+        .connect(submittedTxNotOwner)
+        .transactions(submittedTxIndex);
+
+      expect(transaction).to.not.undefined;
+      expect(transaction.numConfirmations.toNumber()).to.equal(3);
+      expect(transaction.to).to.equal(submittedToAddress);
+      expect(transaction.executed).to.equal(false);
+    });
+
+    it("should be unable to confirm if it have confirmed", async function () {
+      const tx = await submitWallet
+        .connect(submittedTxOwner)
+        .confirmTransaction(submittedTxIndex, { gasLimit: 5000000 });
+      await tx.wait();
+
+      await expect(
+        submitWallet
+          .connect(submittedTxOwner)
+          .confirmTransaction(submittedTxIndex, { gasLimit: 5000000 })
+      ).to.be.revertedWith("tx already confirmed");
+    });
+
+    //TODO: check if the transaction is executed
   });
 });
