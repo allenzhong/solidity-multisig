@@ -286,5 +286,13 @@ describe("MultisigWallet", function () {
           .executeTransaction(submittedTxIndex)
       ).to.be.revertedWith("not an owner");
     });
+
+    it("should check if txIndex exists", async function () {
+      await expect(
+        submitWallet
+          .connect(submittedTxOwner)
+          .executeTransaction(submittedTxIndex + 1, { gasLimit: 5000000 })
+      ).to.be.revertedWith("tx does not exist");
+    });
   });
 });
