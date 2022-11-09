@@ -113,4 +113,8 @@ contract MultisigWallet {
 
     emit ConfirmTransaction(msg.sender, _txIndex);
   }
+
+  function executeTransaction(uint _txIndex) public onlyOwner {
+
+  }
 }
