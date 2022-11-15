@@ -303,7 +303,7 @@ describe("MultisigWallet", function () {
       ).to.be.revertedWith("cannot execute tx");
     });
 
-    it("should be able to execute if it has reach required confirmation number", async function () { 
+    it("should be able to execute if it has reach required confirmation number", async function () {
       const tx0 = await submitWallet
         .connect(submittedTxOwner)
         .confirmTransaction(submittedTxIndex, { gasLimit: 5000000 });
@@ -330,7 +330,7 @@ describe("MultisigWallet", function () {
       expect(event?.event).to.equal("ExecuteTransaction");
     });
 
-    it("should raise error if it has been executed", async function () { 
+    it("should raise error if it has been executed", async function () {
       const tx0 = await submitWallet
         .connect(submittedTxOwner)
         .confirmTransaction(submittedTxIndex, { gasLimit: 5000000 });
@@ -349,9 +349,11 @@ describe("MultisigWallet", function () {
       const tx = await submitWallet
         .connect(submittedTxOwner)
         .executeTransaction(submittedTxIndex, { gasLimit: 5000000 });
-    
+
       await expect(
-        submitWallet.connect(submittedTxOwner).executeTransaction(submittedTxIndex, { gasLimit: 5000000 })
+        submitWallet
+          .connect(submittedTxOwner)
+          .executeTransaction(submittedTxIndex, { gasLimit: 5000000 })
       ).to.be.revertedWith("tx already executed");
     });
 
