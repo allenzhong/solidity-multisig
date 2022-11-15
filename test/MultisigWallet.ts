@@ -252,4 +252,111 @@ describe("MultisigWallet", function () {
 
     //TODO: check if the transaction is executed
   });
+
+  describe("executeFunction", function () {
+    const submittedTxIndex = 0;
+    let submitWallet: MultisigWallet;
+    let submittedTxOwner: any;
+    let walletOwner1: any;
+    let walletOwner2: any;
+    let submittedToAddress: string;
+    let submittedTxNotOwner: any;
+    this.beforeEach(async () => {
+      const { wallet, owner, account1, account2, notOwner } = await loadFixture(
+        deployThreeOwnersFixture
+      );
+      submitWallet = wallet;
+      submittedTxOwner = owner;
+      walletOwner1 = account1;
+      walletOwner2 = account2;
+      submittedToAddress = account1.address;
+      submittedTxNotOwner = notOwner;
+      const result = await wallet
+        .connect(submittedTxOwner)
+        .submitTransaction(submittedToAddress, submittedTxIndex, "0x", {
+          gasLimit: 5000000,
+        });
+      const receipt = await result.wait();
+    });
+
+    it('should be unable to call "executeFunction" by one who is not owner', async function () {
+      await expect(
+        submitWallet
+          .connect(submittedTxNotOwner)
+          .executeTransaction(submittedTxIndex)
+      ).to.be.revertedWith("not an owner");
+    });
+
+    it("should check if txIndex exists", async function () {
+      await expect(
+        submitWallet
+          .connect(submittedTxOwner)
+          .executeTransaction(submittedTxIndex + 1, { gasLimit: 5000000 })
+      ).to.be.revertedWith("tx does not exist");
+    });
+
+    it("should be unable to execute if it has not reach required confirmation number", async function () {
+      await expect(
+        submitWallet
+          .connect(submittedTxOwner)
+          .executeTransaction(submittedTxIndex, { gasLimit: 5000000 })
+      ).to.be.revertedWith("cannot execute tx");
+    });
+
+    it("should be able to execute if it has reach required confirmation number", async function () {
+      const tx0 = await submitWallet
+        .connect(submittedTxOwner)
+        .confirmTransaction(submittedTxIndex, { gasLimit: 5000000 });
+      await tx0.wait();
+
+      const tx1 = await submitWallet
+        .connect(walletOwner1)
+        .confirmTransaction(submittedTxIndex, { gasLimit: 5000000 });
+      await tx1.wait();
+
+      const tx2 = await submitWallet
+        .connect(walletOwner2)
+        .confirmTransaction(submittedTxIndex, { gasLimit: 5000000 });
+      await tx2.wait();
+
+      const tx = await submitWallet
+        .connect(submittedTxOwner)
+        .executeTransaction(submittedTxIndex, { gasLimit: 5000000 });
+      const receipt = await tx.wait();
+
+      const { events } = receipt;
+      const event = events?.at(0);
+
+      expect(event?.event).to.equal("ExecuteTransaction");
+    });
+
+    it("should raise error if it has been executed", async function () {
+      const tx0 = await submitWallet
+        .connect(submittedTxOwner)
+        .confirmTransaction(submittedTxIndex, { gasLimit: 5000000 });
+      await tx0.wait();
+
+      const tx1 = await submitWallet
+        .connect(walletOwner1)
+        .confirmTransaction(submittedTxIndex, { gasLimit: 5000000 });
+      await tx1.wait();
+
+      const tx2 = await submitWallet
+        .connect(walletOwner2)
+        .confirmTransaction(submittedTxIndex, { gasLimit: 5000000 });
+      await tx2.wait();
+
+      const tx = await submitWallet
+        .connect(submittedTxOwner)
+        .executeTransaction(submittedTxIndex, { gasLimit: 5000000 });
+
+      await expect(
+        submitWallet
+          .connect(submittedTxOwner)
+          .executeTransaction(submittedTxIndex, { gasLimit: 5000000 })
+      ).to.be.revertedWith("tx already executed");
+    });
+
+    //TODO: check if the transaction is failed
+  });
 });

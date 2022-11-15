@@ -11,6 +11,7 @@ contract MultisigWallet {
     bytes data
   );
   event ConfirmTransaction(address indexed owner, uint256 indexed txIndex);
+  event ExecuteTransaction(address indexed owner, uint256 indexed txIndex);
 
   address[] public owners;
   mapping(address => bool) public isOwner;
@@ -34,6 +35,11 @@ contract MultisigWallet {
 
   modifier txExists(uint256 _txIndex) {
     require(_txIndex < transactions.length, "tx does not exist");
+    _;
+  }
+
+  modifier notExecuted(uint256 _txIndex) {
+    require(!transactions[_txIndex].executed, "tx already executed");
     _;
   }
 
@@ -112,5 +118,27 @@ contract MultisigWallet {
     transaction.numConfirmations += 1;
 
     emit ConfirmTransaction(msg.sender, _txIndex);
+  }
+
+  function executeTransaction(uint256 _txIndex)
+    public
+    onlyOwner
+    txExists(_txIndex)
+    notExecuted(_txIndex)
+  {
+    Transaction storage transaction = transactions[_txIndex];
+
+    require(
+      transaction.numConfirmations >= numConfirmationsRequired,
+      "cannot execute tx"
+    );
+    transaction.executed = true;
+
+    (bool success, ) = transaction.to.call{ value: transaction.value }(
+      transaction.data
+    );
+    require(success, "tx failed");
+
+    emit ExecuteTransaction(msg.sender, _txIndex);
   }
 }
