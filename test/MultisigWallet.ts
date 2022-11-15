@@ -329,5 +329,32 @@ describe("MultisigWallet", function () {
 
       expect(event?.event).to.equal("ExecuteTransaction");
     });
+
+    it("should raise error if it has been executed", async function () { 
+      const tx0 = await submitWallet
+        .connect(submittedTxOwner)
+        .confirmTransaction(submittedTxIndex, { gasLimit: 5000000 });
+      await tx0.wait();
+
+      const tx1 = await submitWallet
+        .connect(walletOwner1)
+        .confirmTransaction(submittedTxIndex, { gasLimit: 5000000 });
+      await tx1.wait();
+
+      const tx2 = await submitWallet
+        .connect(walletOwner2)
+        .confirmTransaction(submittedTxIndex, { gasLimit: 5000000 });
+      await tx2.wait();
+
+      const tx = await submitWallet
+        .connect(submittedTxOwner)
+        .executeTransaction(submittedTxIndex, { gasLimit: 5000000 });
+    
+      await expect(
+        submitWallet.connect(submittedTxOwner).executeTransaction(submittedTxIndex, { gasLimit: 5000000 })
+      ).to.be.revertedWith("tx already executed");
+    });
+
+    //TODO: check if the transaction is failed
   });
 });

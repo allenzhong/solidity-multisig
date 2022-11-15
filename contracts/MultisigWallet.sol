@@ -38,6 +38,11 @@ contract MultisigWallet {
     _;
   }
 
+  modifier notExecuted(uint256 _txIndex) {
+    require(!transactions[_txIndex].executed, "tx already executed");
+    _;
+  }
+
   modifier notConfirmed(uint256 _txIndex) {
     require(
       !transactions[_txIndex].isConfirmed[msg.sender],
@@ -119,6 +124,7 @@ contract MultisigWallet {
     public
     onlyOwner
     txExists(_txIndex)
+    notExecuted(_txIndex)
   {
     Transaction storage transaction = transactions[_txIndex];
 
