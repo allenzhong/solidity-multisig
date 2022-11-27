@@ -141,4 +141,11 @@ contract MultisigWallet {
 
     emit ExecuteTransaction(msg.sender, _txIndex);
   }
+
+  function revokeConfirmation(uint256 _txIndex) public {
+    Transaction storage transaction = transactions[_txIndex];
+
+    transaction.isConfirmed[msg.sender] = false;
+    transaction.numConfirmations -= 1;
+  }
 }
