@@ -405,5 +405,11 @@ describe("MultisigWallet", function () {
       expect(result).to.not.undefined;
       expect(result.numConfirmations.toNumber()).to.equal(0);
     });
+
+    //TODO:
+    // 1. check if the transaction is executed
+    // 2. check if sender is the owner
+    // 3. check if the transaction is not exist
+    // 4. check if the transaction is confirmed
   });
 });
